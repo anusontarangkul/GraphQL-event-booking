@@ -5,8 +5,10 @@ const { buildSchema } = require('graphql');
 const mongoose = require('mongoose');
 const app = express();
 app.use(bodyParser.json());
+const bcrypt = require('bcryptjs');
 
 const Event = require('./models/event')
+const User = require('./models/user')
 
 
 app.use('/graphql', graphqlHTTP({
@@ -19,6 +21,12 @@ app.use('/graphql', graphqlHTTP({
             date: String!
         }
 
+        type User {
+            _id: ID!
+            email: String!
+            password: String
+        }
+
         input EventInput {
             title: String!
             description: String!
@@ -26,11 +34,17 @@ app.use('/graphql', graphqlHTTP({
             date: String!
         }
 
+        input UserInput {
+            email: String!
+            password: String!
+        }
+
         type RootQuery {
             events: [Event!]!
         }
         type RootMutation {
             createEvent(eventInput:  EventInput): Event
+            createUser(userInput: UserInput): User
         }
         schema {
             query: RootQuery
@@ -55,18 +69,54 @@ app.use('/graphql', graphqlHTTP({
                 title: args.eventInput.title,
                 description: args.eventInput.description,
                 price: +args.eventInput.price,
-                date: new Date(args.eventInput.date)
+                date: new Date(args.eventInput.date),
+                creator: '6129a29d23ecd562449ddb5b'
             });
+            let createdEvent;
             return event
                 .save()
                 .then(result => {
-                    console.log(result);
-                    return { ...result._doc, _id: result._doc._id.toString() };
+                    createdEvent = { ...result._doc, _id: result._doc._id.toString() };
+                    return User.findById('6129a29d23ecd562449ddb5b')
+                })
+                .then(user => {
+                    if (!user) {
+                        throw new Error('User not found.')
+                    }
+                    user.createdEvents.push(event)
+                    return user.save();
+                })
+                .then(result => {
+                    return createdEvent;
                 })
                 .catch(err => {
                     console.log(err);
                     throw err;
                 });
+        },
+        createUser: args => {
+            return User.findOne({ email: args.userInput.email })
+                .then(user => {
+                    if (user) {
+                        throw new Error('User exists already.')
+                    }
+                    return bcrypt
+                        .hash(args.userInput.password, 12)
+                })
+
+                .then(hashedPassword => {
+                    const user = new User({
+                        email: args.userInput.email,
+                        password: hashedPassword
+                    })
+                    return user.save()
+                })
+                .then(result => {
+                    return { ...result._doc, password: null }
+                })
+                .catch(err => {
+                    throw err
+                })
         }
     },
     graphiql: true
