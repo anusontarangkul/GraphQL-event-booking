@@ -7,6 +7,16 @@ const mongoose = require('mongoose');
 const app = express();
 app.use(bodyParser.json());
 
+app.use((req, res, next) => {
+    res.setHeader('Access-Control-Allow-Origin', '*');
+    res.setHeader('Access-Control-Allow-Methods', 'POST,GET,OPTIONS');
+    res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization')
+    if (req.method === 'OPTIONS') {
+        return res.sendStatus(200);
+    }
+    next();
+})
+
 const graphQlSchema = require('./graphql/schema/index');
 const graphQlResolvers = require('./graphql/resolvers/index')
 
@@ -23,7 +33,7 @@ mongoose
         `mongodb+srv://${process.env.MONGO_USER}:${process.env.MONGO_PASSWORD}@cluster0.z6ujk.mongodb.net/${process.env.MONGO_DB}?retryWrites=true&w=majority`
     )
     .then(() => {
-        app.listen(3000);
+        app.listen(8000);
     })
     .catch(err => {
         console.log(err);
